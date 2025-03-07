@@ -68,10 +68,15 @@ function draw() {
     drawTitleScreen();
   } else if (state === "ml5") {
     drawMl5();
+    select('#interactive-iframe').remove();
   } else if (state === "interactive") {
     drawInteractiveFiction();
   } else if (state === "tracery") {
     drawTracery();
+    select('#interactive-iframe').remove();
+  } else if (state === "credits") {
+    drawCredits();
+    select('#interactive-iframe').remove();
   }
   
   // always draw navigation buttons at the top
@@ -84,7 +89,8 @@ function getNavButtons() {
   let btnData = [
     { label: "ml5", state: "ml5", w: 200, h: 50 },
     { label: "interactive fiction", state: "interactive", w: 300, h: 50 },
-    { label: "tracery", state: "tracery", w: 200, h: 50 }
+    { label: "tracery", state: "tracery", w: 200, h: 50 },
+    { label: "credits", state: "credits", w: 200, h: 50 }
   ];
   let spacing = 20;
   let totalWidth = btnData.reduce((acc, btn) => acc + btn.w, 0) + spacing * (btnData.length - 1);
@@ -195,10 +201,16 @@ function drawMl5() {
 
 function drawInteractiveFiction() {
   background(200);
-  textAlign(CENTER, CENTER);
-  textSize(48);
-  fill(0);
-  text("Interactive Fiction Placeholder", width / 2, height / 2);
+  let navButtons = getNavButtons();
+  let navHeight = navButtons[0].h + 40; // height of nav buttons + vertical position
+  let iframeY = navHeight + 20; // add some spacing
+  let iframeHeight = height - iframeY;
+  let iframe = createElement('iframe');
+  iframe.attribute('src', 'if/index.html');
+  iframe.attribute('width', '100%');
+  iframe.attribute('height', iframeHeight);
+  iframe.position(0, iframeY);
+  iframe.id('interactive-iframe');
 }
 
 function drawTracery() {
@@ -207,6 +219,14 @@ function drawTracery() {
   textSize(48);
   fill(0);
   text("Tracery Placeholder", width / 2, height / 2);
+}
+
+function drawCredits() {
+  background(255);
+  textAlign(CENTER, CENTER);
+  textSize(24);
+  fill(0);
+  text("Inform 7 code written with generative assists from Gemini and ChatGPT 4.0.\nIridium template modified using CoPilot Agent and GPT 4.0.\nTracery generator code assisted with text nodes scraped from science fiction using Python code written by ChatGPT o3.\nSVG generated with ChatGPT 4.0.\nml5 code based on remixing examples provided by the ml5 team.", width / 2, height / 2);
 }
 
 // ------------- Input, Sentiment, and Face/Hand Processing -------------
@@ -328,6 +348,7 @@ function mousePressed() {
       if (state === "ml5") {
         inputBox.elt.focus();
       }
+      select('#interactive-iframe').remove();
       return;
     }
   }
