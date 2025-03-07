@@ -1,10 +1,3 @@
-// modified from the ml5.js sentiment analysis demo - https://editor.p5js.org/ml5/sketches/hopIvsCGL
-// mixed with ml5.js facemesh lip tracking demo - https://editor.p5js.org/ml5/sketches/9y9W7eAee
-// and now with integrated basic particle systems for handling textual elements
-// adding a title screen with finger tracking modified from - https://editor.p5js.org/ml5/sketches/QGH3dwJ1A
-// tracking letters cleared with the finger movements for game-like interface
-// chatgpt o3-mini-high addition of navigation system
-
 // variables for title stuff
 let state = "title";
 let titleLetters = [];
@@ -27,16 +20,30 @@ let options = { maxFaces: 1, refineLandmarks: false, flipHorizontal: false };
 let textX;
 let textY;
 let wordParticles = [];
+let iframeCreated = false; // Flag to track if iframe has been created
+
+// Variables for Tracery functionality
+let traceryGrammar;
+let sightingJSON;
+let traceryElementsCreated = false; // Flag to track if tracery elements have been created
+let traceryUpdateInterval = 3000; // 3 seconds between updates
+let traceryIntervalId = null; // Store interval ID for clearing later
+
+// Variables for the tracery background particles
+let traceryParticles = [];
 
 // preload all three ml5 models
 function preload() {
   sentiment = ml5.sentiment("MovieReviews");
   faceMesh = ml5.faceMesh(options);
   handPose = ml5.handPose();
+  
+  // Load Tracery JSON data
+  sightingJSON = loadJSON('text/sighting.json');
 }
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  createCanvas(windowWidth-15, windowHeight-15);
   textX = width / 2;
   textY = height / 2;
   
@@ -66,17 +73,30 @@ function draw() {
   // draw state-specific background/sketch
   if (state === "title") {
     drawTitleScreen();
+    cleanupTraceryElements();
   } else if (state === "ml5") {
     drawMl5();
-    select('#interactive-iframe').remove();
+    if (iframeCreated) {
+      select('#interactive-iframe').remove();
+      iframeCreated = false;
+    }
+    cleanupTraceryElements();
   } else if (state === "interactive") {
     drawInteractiveFiction();
+    cleanupTraceryElements();
   } else if (state === "tracery") {
     drawTracery();
-    select('#interactive-iframe').remove();
+    if (iframeCreated) {
+      select('#interactive-iframe').remove();
+      iframeCreated = false;
+    }
   } else if (state === "credits") {
     drawCredits();
-    select('#interactive-iframe').remove();
+    if (iframeCreated) {
+      select('#interactive-iframe').remove();
+      iframeCreated = false;
+    }
+    cleanupTraceryElements();
   }
   
   // always draw navigation buttons at the top
@@ -201,32 +221,130 @@ function drawMl5() {
 
 function drawInteractiveFiction() {
   background(200);
-  let navButtons = getNavButtons();
-  let navHeight = navButtons[0].h + 40; // height of nav buttons + vertical position
-  let iframeY = navHeight + 20; // add some spacing
-  let iframeHeight = height - iframeY;
-  let iframe = createElement('iframe');
-  iframe.attribute('src', 'if/index.html');
-  iframe.attribute('width', '100%');
-  iframe.attribute('height', iframeHeight);
-  iframe.position(0, iframeY);
-  iframe.id('interactive-iframe');
+  
+  // Only create the iframe if it doesn't exist yet
+  if (!iframeCreated) {
+    let navButtons = getNavButtons();
+    let navHeight = navButtons[0].h + 40; // height of nav buttons + vertical position
+    let iframeY = navHeight + 20; // add some spacing
+    let iframeHeight = height - iframeY;
+    let iframe = createElement('iframe');
+    iframe.attribute('src', 'if/index.html');
+    iframe.attribute('width', '100%');
+    iframe.attribute('height', iframeHeight);
+    iframe.position(0, iframeY);
+    iframe.id('interactive-iframe');
+    iframeCreated = true;
+  }
 }
 
 function drawTracery() {
-  background(220);
-  textAlign(CENTER, CENTER);
-  textSize(48);
-  fill(0);
-  text("Tracery Placeholder", width / 2, height / 2);
+  // Black canvas background for consistency with fading
+  background(0, 0, 0, 50); // Using semi-transparent background for particle trail effect
+  
+  // Update and display tracery background particles
+  for (let i = traceryParticles.length - 1; i >= 0; i--) {
+    traceryParticles[i].update();
+    traceryParticles[i].show();
+    if (traceryParticles[i].finished()) {
+      traceryParticles.splice(i, 1);
+    }
+  }
+  
+  // Only create the tracery elements if they don't exist yet
+  if (!traceryElementsCreated) {
+    createTraceryElements();
+    traceryElementsCreated = true;
+    
+    // Initialize grammar
+    if (sightingJSON) {
+      traceryGrammar = tracery.createGrammar(sightingJSON);
+      updateTraceryContent(); // Initial content update
+      
+      // Set interval to update content every 3 seconds
+      traceryIntervalId = setInterval(updateTraceryContent, traceryUpdateInterval);
+    }
+  }
+}
+
+function createTraceryElements() {
+  // Get nav button height to position elements properly
+  let navButtons = getNavButtons();
+  let topOffset = navButtons[0].h + 60; // height of nav buttons + vertical position + spacing
+  
+  // Create title element
+  let titleElement = createElement('h1', 'Alien Sightings Generator');
+  titleElement.id('tracery-title');
+  titleElement.position(0, topOffset);
+  titleElement.style('width', '100%');
+  titleElement.style('text-align', 'center');
+  titleElement.style('color', '#39ff14'); // Neon green
+  titleElement.style('text-shadow', '0 0 10px #39ff14, 0 0 20px #39ff14');
+  
+  // Create illustration container
+  let illustrationElement = createElement('div');
+  illustrationElement.id('tracery-illustration');
+  illustrationElement.position(0, topOffset + 70);
+  illustrationElement.style('width', '100%');
+  illustrationElement.style('text-align', 'center');
+  
+  // Create sightings text element
+  let sightingsElement = createElement('p');
+  sightingsElement.id('tracery-sightings');
+  sightingsElement.position(width/2 - 300, topOffset + 300);
+  sightingsElement.style('width', '600px');
+  sightingsElement.style('min-height', '100px');
+  sightingsElement.style('margin', '0 auto');
+  sightingsElement.style('padding', '20px');
+  sightingsElement.style('background-color', 'rgba(0, 255, 0, 0.1)');
+  sightingsElement.style('border', '2px solid #39ff14');
+  sightingsElement.style('box-shadow', '0 0 20px #39ff14');
+  sightingsElement.style('font-size', '1.2em');
+  sightingsElement.style('color', 'white');
+  sightingsElement.style('text-align', 'center');
+}
+
+function updateTraceryContent() {
+  if (traceryGrammar) {
+    // Generate new content
+    let sightingReport = traceryGrammar.flatten("#origin#");
+    let sightingImage = traceryGrammar.flatten("#image#");
+    let sightingTitle = traceryGrammar.flatten("#title#");
+    
+    // Update DOM elements
+    select('#tracery-title').html(sightingTitle);
+    select('#tracery-sightings').html(sightingReport);
+    select('#tracery-illustration').html(sightingImage);
+  }
+}
+
+function cleanupTraceryElements() {
+  // If we're not in tracery mode but elements exist, remove them
+  if (traceryElementsCreated) {
+    // Clear the update interval
+    if (traceryIntervalId) {
+      clearInterval(traceryIntervalId);
+      traceryIntervalId = null;
+    }
+    
+    // Remove DOM elements
+    select('#tracery-title').remove();
+    select('#tracery-illustration').remove();
+    select('#tracery-sightings').remove();
+    
+    traceryElementsCreated = false;
+  }
+  
+  // Clear the tracery particles when leaving tracery mode
+  traceryParticles = [];
 }
 
 function drawCredits() {
-  background(255);
+  background(0); // Change to black background
   textAlign(CENTER, CENTER);
   textSize(24);
-  fill(0);
-  text("Inform 7 code written with generative assists from Gemini and ChatGPT 4.0.\nIridium template modified using CoPilot Agent and GPT 4.0.\nTracery generator code assisted with text nodes scraped from science fiction using Python code written by ChatGPT o3.\nSVG generated with ChatGPT 4.0.\nml5 code based on remixing examples provided by the ml5 team.", width / 2, height / 2);
+  fill(255); // Change to white text
+  text("Inform 7 code written with generative assists from Gemini and ChatGPT 4.0.\n\nIridium template modified using CoPilot Agent and GPT 4.0.\n\nTracery generator code assisted with text nodes scraped from science fiction\nusing Python code written by ChatGPT o3.\n\nSVG generated with ChatGPT 4.0.\n\nml5 code based on remixing examples provided by the ml5 team.\n\nSome remixing done with Claude 3.7 Sonnet.", width / 2, height / 2);
 }
 
 // ------------- Input, Sentiment, and Face/Hand Processing -------------
@@ -256,6 +374,16 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   video.size(width, height);
   video.hide();
+  
+  // Reposition tracery elements if they exist
+  if (traceryElementsCreated) {
+    let navButtons = getNavButtons();
+    let topOffset = navButtons[0].h + 60;
+    
+    select('#tracery-title').position(0, topOffset);
+    select('#tracery-illustration').position(0, topOffset + 70);
+    select('#tracery-sightings').position(width/2 - 300, topOffset + 300);
+  }
 }
 
 function gotFaces(results) {
@@ -337,6 +465,9 @@ function drawSentimentPattern() {
 
 function mousePressed() {
   let navButtons = getNavButtons();
+  let clickedButton = false;
+  
+  // Check if a nav button was clicked
   for (let btn of navButtons) {
     if (
       mouseX > btn.x - btn.w / 2 &&
@@ -344,13 +475,32 @@ function mousePressed() {
       mouseY > btn.y - btn.h / 2 &&
       mouseY < btn.y + btn.h / 2
     ) {
+      clickedButton = true;
+      
+      // If we're leaving interactive fiction state and an iframe exists, remove it
+      if (state === "interactive" && iframeCreated && btn.state !== "interactive") {
+        select('#interactive-iframe').remove();
+        iframeCreated = false;
+      }
+      
+      // If we're leaving tracery state, clean up the elements
+      if (state === "tracery" && btn.state !== "tracery") {
+        cleanupTraceryElements();
+      }
+      
       state = btn.state;
       if (state === "ml5") {
         inputBox.elt.focus();
       }
-      select('#interactive-iframe').remove();
       return;
     }
+  }
+  
+  // If we're in tracery mode and didn't click a button, add a particle
+  if (state === "tracery" && !clickedButton && traceryGrammar) {
+    let output = traceryGrammar.flatten("#title#");
+    let p = new TraceryParticle(mouseX, mouseY, output);
+    traceryParticles.push(p);
   }
   
   // For ml5 state, if click isn't on a nav button, ensure input remains focused
@@ -390,5 +540,36 @@ class LetterParticle {
     noStroke();
     textSize(this.size);
     text(this.letter, this.x, this.y);
+  }
+}
+
+// ------------- Tracery Background Particle Class -------------
+
+class TraceryParticle {
+  constructor(x, y, text) {
+    this.x = x;
+    this.y = y;
+    this.vx = random(-1, 1);
+    this.vy = random(-1, 1);
+    this.size = random(15, 20);
+    this.text = text;
+  }
+  
+  finished() {
+    return (this.x < 0 || this.x > windowWidth || this.y < 0 || this.y > windowHeight);
+  }
+  
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+  
+  show() {
+    noStroke();
+    textSize(this.size);
+    textFont("Courier");
+    textAlign(CENTER, CENTER);
+    fill(57, 255, 20); // Neon green
+    text(this.text, this.x, this.y);
   }
 }
