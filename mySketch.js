@@ -8,6 +8,7 @@ let hands = [];
 
 // variables for main typing analysis
 let sentiment;
+let this;
 let inputBox;
 let currentSentimentScore = 0.5; // start neutral
 let currentText = ""; // holds only the most recent word being typed
